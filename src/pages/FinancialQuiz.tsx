@@ -1,5 +1,5 @@
-
 import { useState } from 'react';
+import { MessageSquare, Calculator, BookOpen, ArrowRight } from 'lucide-react';
 import QuizQuestion from '../components/QuizQuestion';
 import { quizQuestions } from '../data/dummyData';
 

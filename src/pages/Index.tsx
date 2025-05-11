@@ -1,5 +1,6 @@
 
 import { Link } from 'react-router-dom';
+import { MessageSquare, Calculator, PieChart, ArrowRight } from 'lucide-react';
 
 const Index = () => {
   return (
