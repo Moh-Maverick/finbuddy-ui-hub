@@ -1,6 +1,7 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Mic, Send } from 'lucide-react';
+import { fetchGroqResponse } from '../lib/groqApi';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: number;
@@ -14,67 +15,36 @@ interface ChatInterfaceProps {
 }
 
 const ChatInterface = ({ selectedLanguage }: ChatInterfaceProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: `Hello! I'm your FinBuddy assistant. How can I help you with your finances today?`,
-      sender: 'bot',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([{
+    id: 1,
+    text: `Hello! I'm your FinBuddy assistant. How can I help you with your finances today?`,
+    sender: 'bot',
+    timestamp: new Date(),
+  }]);
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Dummy responses based on selected language
-  const dummyResponses: Record<string, string[]> = {
-    English: [
-      "To improve your credit score, make sure to pay all your bills on time and keep your credit utilization below 30%.",
-      "Based on standard calculations, with this loan amount and interest rate, your EMI would be approximately ₹15,000 per month.",
-      "A mutual fund is a type of investment vehicle that pools money from many investors to purchase securities.",
-      "SIPs or Systematic Investment Plans allow you to invest a fixed amount regularly in mutual funds, helping you build wealth over time.",
-      "For first-time home buyers, I recommend checking government schemes like PMAY that offer subsidies on home loans."
-    ],
-    Hindi: [
-      "अपने क्रेडिट स्कोर को सुधारने के लिए, अपने सभी बिलों का समय पर भुगतान करें और अपने क्रेडिट उपयोग को 30% से कम रखें।",
-      "मानक गणनाओं के आधार पर, इस ऋण राशि और ब्याज दर के साथ, आपका ईएमआई लगभग ₹15,000 प्रति माह होगा।",
-      "म्यूचुअल फंड एक प्रकार का निवेश वाहन है जो प्रतिभूतियों को खरीदने के लिए कई निवेशकों से पैसा जुटाता है।",
-      "SIP या सिस्टेमैटिक इन्वेस्टमेंट प्लान आपको म्यूचुअल फंड में नियमित रूप से एक निश्चित राशि निवेश करने की अनुमति देते हैं, जिससे आपको समय के साथ धन बनाने में मदद मिलती है।",
-      "पहली बार घर खरीदने वालों के लिए, मैं PMAY जैसी सरकारी योजनाओं की जांच करने की सलाह देता हूं जो होम लोन पर सब्सिडी प्रदान करते हैं।"
-    ],
-    Kannada: [
-      "ನಿಮ್ಮ ಕ್ರೆಡಿಟ್ ಸ್ಕೋರ್ ಸುಧಾರಿಸಲು, ನಿಮ್ಮ ಎಲ್ಲಾ ಬಿಲ್‌ಗಳನ್ನು ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಪಾವತಿಸಿ ಮತ್ತು ನಿಮ್ಮ ಕ್ರೆಡಿಟ್ ಬಳಕೆಯನ್ನು 30% ಕ್ಕಿಂತ ಕಡಿಮೆ ಇರಿಸಿ.",
-      "ಪ್ರಮಾಣಿತ ಲೆಕ್ಕಾಚಾರಗಳ ಪ್ರಕಾರ, ಈ ಸಾಲದ ಮೊತ್ತ ಮತ್ತು ಬಡ್ಡಿ ದರದೊಂದಿಗೆ, ನಿಮ್ಮ EMI ಸುಮಾರು ₹15,000 ಪ್ರತಿ ತಿಂಗಳು ಆಗಿರುತ್ತದೆ.",
-      "ಮ್ಯೂಚುಯಲ್ ಫಂಡ್ ಎನ್ನುವುದು ಸೆಕ್ಯುರಿಟೀಸ್ ಖರೀದಿಸಲು ಅನೇಕ ಹೂಡಿಕೆದಾರರಿಂದ ಹಣವನ್ನು ಪೂಲ್ ಮಾಡುವ ಒಂದು ರೀತಿಯ ಇನ್ವೆಸ್ಟ್‌ಮೆಂಟ್ ವಾಹನ.",
-      "SIPs ಅಥವಾ ಸಿಸ್ಟಮ್ಯಾಟಿಕ್ ಇನ್ವೆಸ್ಟ್‌ಮೆಂಟ್ ಪ್ಲಾನ್‌ಗಳು ನಿಮಗೆ ಮ್ಯೂಚುಯಲ್ ಫಂಡ್‌ಗಳಲ್ಲಿ ನಿಯಮಿತವಾಗಿ ನಿಗದಿತ ಮೊತ್ತವನ್ನು ಹೂಡಿಕೆ ಮಾಡಲು ಅನುಮತಿಸುತ್ತವೆ, ಇದು ನಿಮಗೆ ಕಾಲಾನಂತರದಲ್ಲಿ ಸಂಪತ್ತು ಸೃಷ್ಟಿಸಲು ಸಹಾಯ ಮಾಡುತ್ತದೆ.",
-      "ಮೊದಲ ಬಾರಿಗೆ ಮನೆ ಖರೀದಿದಾರರಿಗೆ, ನಾನು ಗೃಹ ಸಾಲಗಳ ಮೇಲೆ ಸಬ್ಸಿಡಿಗಳನ್ನು ನೀಡುವ PMAY ನಂತಹ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಸಲಹೆ ನೀಡುತ್ತೇನೆ."
-    ],
-  };
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Add this effect to respond to language change
+  // Reset chat history and show welcome message when language changes
   useEffect(() => {
-    // Add a bot message when language changes
-    if (messages.length > 0) {
-      const languageWelcome = {
-        English: "I've switched to English. How can I help you?",
-        Hindi: "मैंने हिंदी में स्विच कर दिया है। मैं आपकी कैसे मदद कर सकता हूँ?",
-        Kannada: "ನಾನು ಕನ್ನಡಕ್ಕೆ ಬದಲಾಯಿಸಿದ್ದೇನೆ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?"
-      };
-
-      setMessages(prevMessages => [
-        ...prevMessages, 
-        {
-          id: Date.now(),
-          text: languageWelcome[selectedLanguage as keyof typeof languageWelcome],
-          sender: 'bot',
-          timestamp: new Date()
-        }
-      ]);
-    }
+    const languageWelcome = {
+      English: "Hello! I'm your FinBuddy assistant. How can I help you with your finances today?",
+      Hindi: "नमस्ते! मैं आपका FinBuddy सहायक हूँ। मैं आज आपकी वित्तीय मदद कैसे कर सकता हूँ?",
+      Kannada: "ಹಲೋ! ನಾನು ನಿಮ್ಮ FinBuddy ಸಹಾಯಕನು. ನಾನು ನಿಮ್ಮ ಹಣಕಾಸಿನ ವಿಷಯಗಳಲ್ಲಿ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?"
+    };
+    setMessages([
+      {
+        id: Date.now(),
+        text: languageWelcome[selectedLanguage as keyof typeof languageWelcome] || languageWelcome.English,
+        sender: 'bot',
+        timestamp: new Date(),
+      }
+    ]);
   }, [selectedLanguage]);
 
   const scrollToBottom = () => {
@@ -85,35 +55,42 @@ const ChatInterface = ({ selectedLanguage }: ChatInterfaceProps) => {
     setInputValue(e.target.value);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputValue.trim() === '') return;
 
-    // Add user message
     const userMessage: Message = {
       id: Date.now(),
       text: inputValue,
       sender: 'user',
       timestamp: new Date(),
     };
-    
+
     setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInputValue('');
+    setIsLoading(true);
 
-    // Simulate bot response after a delay
-    setTimeout(() => {
-      const randomResponse = dummyResponses[selectedLanguage][
-        Math.floor(Math.random() * dummyResponses[selectedLanguage].length)
-      ];
-      
+    try {
+      const botReply = await fetchGroqResponse(userMessage.text, selectedLanguage);
       const botMessage: Message = {
         id: Date.now() + 1,
-        text: randomResponse,
+        text: botReply,
         sender: 'bot',
         timestamp: new Date(),
       };
-      
       setMessages((prevMessages) => [...prevMessages, botMessage]);
-    }, 1000);
+    } catch (error) {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: Date.now() + 2,
+          text: "Sorry, there was an error connecting to the assistant.",
+          sender: 'bot',
+          timestamp: new Date(),
+        }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -124,7 +101,7 @@ const ChatInterface = ({ selectedLanguage }: ChatInterfaceProps) => {
 
   const toggleListening = () => {
     setIsListening(!isListening);
-    
+
     // Simulate speech recognition
     if (!isListening) {
       setTimeout(() => {
@@ -142,23 +119,27 @@ const ChatInterface = ({ selectedLanguage }: ChatInterfaceProps) => {
           <span>FinBuddy Assistant - {selectedLanguage}</span>
         </div>
       </div>
-      
+
       <div className="h-96 overflow-y-auto p-4 bg-finbuddy-50">
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`mb-4 flex ${
-              message.sender === 'user' ? 'justify-end' : 'justify-start'
-            }`}
+            className={`mb-4 flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
+              }`}
           >
             <div
-              className={`rounded-lg px-4 py-2 max-w-xs sm:max-w-sm break-words ${
-                message.sender === 'user'
-                  ? 'bg-finbuddy-600 text-white'
-                  : 'bg-white border border-finbuddy-100'
-              }`}
+              className={`rounded-lg px-4 py-2 max-w-xs sm:max-w-sm break-words ${message.sender === 'user'
+                ? 'bg-finbuddy-600 text-white'
+                : 'bg-white border border-finbuddy-100'
+                }`}
             >
-              <div className="text-sm">{message.text}</div>
+              {message.sender === 'bot' ? (
+                <div className="text-sm">
+                  <ReactMarkdown>{message.text}</ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-sm">{message.text}</div>
+              )}
               <div className="text-xs text-right mt-1 opacity-70">
                 {message.timestamp.toLocaleTimeString([], {
                   hour: '2-digit',
@@ -168,14 +149,20 @@ const ChatInterface = ({ selectedLanguage }: ChatInterfaceProps) => {
             </div>
           </div>
         ))}
+        {isLoading && (
+          <div className="mb-4 flex justify-start">
+            <div className="rounded-lg px-4 py-2 max-w-xs sm:max-w-sm bg-white border border-finbuddy-100">
+              <div className="text-sm">FinBuddy is typing...</div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
-      
+
       <div className="p-4 border-t border-finbuddy-100 flex">
         <button
-          className={`mr-2 p-2 rounded-full ${
-            isListening ? 'bg-red-500 text-white' : 'bg-finbuddy-100 text-finbuddy-600'
-          }`}
+          className={`mr-2 p-2 rounded-full ${isListening ? 'bg-red-500 text-white' : 'bg-finbuddy-100 text-finbuddy-600'
+            }`}
           onClick={toggleListening}
         >
           <Mic size={20} />
